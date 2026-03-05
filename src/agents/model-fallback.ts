@@ -3,6 +3,8 @@ import {
   resolveAgentModelFallbackValues,
   resolveAgentModelPrimaryValue,
 } from "../config/model-input.js";
+import { createSubsystemLogger } from "../logging/subsystem.js";
+import { sleep } from "../utils.js";
 import {
   ensureAuthProfileStore,
   getSoonestCooldownExpiry,
@@ -27,6 +29,20 @@ import {
 } from "./model-selection.js";
 import type { FailoverReason } from "./pi-embedded-helpers.js";
 import { isLikelyContextOverflowError } from "./pi-embedded-helpers.js";
+
+const log = createSubsystemLogger("model-fallback");
+
+// When a provider returns a transient 5xx (e.g. 503 "Loading model" during cold-start),
+// retry the same model for up to this duration before giving up.
+const WARMUP_RETRY_MAX_MS = 5 * 60 * 1000; // 5 minutes
+const WARMUP_RETRY_INITIAL_DELAY_MS = 5_000; // 5 seconds
+const WARMUP_RETRY_MAX_DELAY_MS = 30_000; // cap at 30 seconds
+
+/** Returns true for transient server-side errors that may resolve on retry (5xx, connection reset). */
+function isWarmupRetryableError(err: unknown): boolean {
+  const fe = coerceToFailoverError(err);
+  return fe?.reason === "timeout";
+}
 
 type ModelCandidate = {
   provider: string;
@@ -127,17 +143,40 @@ async function runFallbackCandidate<T>(params: {
   run: (provider: string, model: string) => Promise<T>;
   provider: string;
   model: string;
+  /** Timestamp (Date.now()) until which transient 5xx errors are retried. */
+  warmupRetryDeadline?: number;
 }): Promise<{ ok: true; result: T } | { ok: false; error: unknown }> {
-  try {
-    return {
-      ok: true,
-      result: await params.run(params.provider, params.model),
-    };
-  } catch (err) {
-    if (shouldRethrowAbort(err)) {
-      throw err;
+  let delayMs = WARMUP_RETRY_INITIAL_DELAY_MS;
+  let warmupAttempt = 0;
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    try {
+      return {
+        ok: true,
+        result: await params.run(params.provider, params.model),
+      };
+    } catch (err) {
+      if (shouldRethrowAbort(err)) {
+        throw err;
+      }
+
+      // Retry transient 5xx (e.g. 503 "Loading model" cold-start) until deadline.
+      const remaining = (params.warmupRetryDeadline ?? 0) - Date.now();
+      if (remaining > 2_000 && isWarmupRetryableError(err)) {
+        warmupAttempt += 1;
+        const actualDelay = Math.min(delayMs, remaining - 1_000);
+        const errMsg = err instanceof Error ? err.message : String(err);
+        log.info(
+          `${params.provider}/${params.model} warmup retry ${warmupAttempt} in ${actualDelay}ms: ${errMsg}`,
+        );
+        await sleep(actualDelay);
+        delayMs = Math.min(delayMs * 2, WARMUP_RETRY_MAX_DELAY_MS);
+        continue;
+      }
+
+      return { ok: false, error: err };
     }
-    return { ok: false, error: err };
   }
 }
 
@@ -146,11 +185,13 @@ async function runFallbackAttempt<T>(params: {
   provider: string;
   model: string;
   attempts: FallbackAttempt[];
+  warmupRetryDeadline?: number;
 }): Promise<{ success: ModelFallbackRunResult<T> } | { error: unknown }> {
   const runResult = await runFallbackCandidate({
     run: params.run,
     provider: params.provider,
     model: params.model,
+    warmupRetryDeadline: params.warmupRetryDeadline,
   });
   if (runResult.ok) {
     return {
@@ -441,6 +482,11 @@ export async function runWithModelFallback<T>(params: {
   fallbacksOverride?: string[];
   run: (provider: string, model: string) => Promise<T>;
   onError?: ModelFallbackErrorHandler;
+  /**
+   * Max time in ms to retry transient 5xx errors (e.g. 503 "Loading model") per candidate
+   * before giving up and moving to the next fallback. Defaults to WARMUP_RETRY_MAX_MS (5 min).
+   */
+  warmupRetryMaxMs?: number;
 }): Promise<ModelFallbackRunResult<T>> {
   const candidates = resolveFallbackCandidates({
     cfg: params.cfg,
@@ -455,6 +501,9 @@ export async function runWithModelFallback<T>(params: {
   let lastError: unknown;
 
   const hasFallbackCandidates = candidates.length > 1;
+  // Deadline is shared across all candidates: if the primary is still warming up after 5 min,
+  // we don't retry fallbacks as well (the full budget is consumed by the primary).
+  const warmupRetryDeadline = Date.now() + (params.warmupRetryMaxMs ?? WARMUP_RETRY_MAX_MS);
 
   for (let i = 0; i < candidates.length; i += 1) {
     const candidate = candidates[i];
@@ -500,7 +549,12 @@ export async function runWithModelFallback<T>(params: {
       }
     }
 
-    const attemptRun = await runFallbackAttempt({ run: params.run, ...candidate, attempts });
+    const attemptRun = await runFallbackAttempt({
+      run: params.run,
+      ...candidate,
+      attempts,
+      warmupRetryDeadline,
+    });
     if ("success" in attemptRun) {
       return attemptRun.success;
     }
