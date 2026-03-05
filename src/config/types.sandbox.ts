@@ -40,6 +40,8 @@ export type SandboxDockerSettings = {
   dns?: string[];
   /** Extra host mappings (e.g. ["api.local:10.0.0.2"]). */
   extraHosts?: string[];
+  /** Publish container ports to the host (e.g. ["4444:4444", "8080:8080"]). Maps to docker -p flags. */
+  ports?: string[];
   /** Additional bind mounts (host:container:mode format, e.g. ["/host/path:/container/path:rw"]). */
   binds?: string[];
   /**

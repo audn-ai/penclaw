@@ -362,6 +362,11 @@ export function buildSandboxCreateArgs(params: {
   if (params.cfg.network) {
     args.push("--network", params.cfg.network);
   }
+  for (const port of params.cfg.ports ?? []) {
+    if (port.trim()) {
+      args.push("-p", port);
+    }
+  }
   if (params.cfg.user) {
     args.push("--user", params.cfg.user);
   }

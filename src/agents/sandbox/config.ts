@@ -112,6 +112,9 @@ export function resolveSandboxDockerConfig(params: {
     ulimits,
     seccompProfile: agentDocker?.seccompProfile ?? globalDocker?.seccompProfile,
     apparmorProfile: agentDocker?.apparmorProfile ?? globalDocker?.apparmorProfile,
+    ports: [...(globalDocker?.ports ?? []), ...(agentDocker?.ports ?? [])].length
+      ? [...(globalDocker?.ports ?? []), ...(agentDocker?.ports ?? [])]
+      : undefined,
     dns: agentDocker?.dns ?? globalDocker?.dns,
     extraHosts: agentDocker?.extraHosts ?? globalDocker?.extraHosts,
     binds: binds.length ? binds : undefined,
