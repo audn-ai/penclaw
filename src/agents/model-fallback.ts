@@ -17,6 +17,7 @@ import { normalizePluginsConfig } from "../plugins/config-state.js";
 import { getCurrentPluginMetadataSnapshot } from "../plugins/current-plugin-metadata-snapshot.js";
 import { resolvePluginControlPlaneFingerprint } from "../plugins/plugin-control-plane-context.js";
 import { isPluginProvidersLoadInFlight } from "../plugins/providers.runtime.js";
+import { sleep } from "../utils.js";
 import {
   getActivePluginRegistryWorkspaceDirFromState,
   getPluginRegistryState,
@@ -146,6 +147,18 @@ type FailoverAttribution = {
   sessionId?: string;
   lane?: string;
 };
+
+// When a provider returns a transient 5xx (e.g. 503 "Loading model" during cold-start),
+// retry the same model for up to this duration before giving up.
+const WARMUP_RETRY_MAX_MS = 5 * 60 * 1000; // 5 minutes
+const WARMUP_RETRY_INITIAL_DELAY_MS = 5_000; // 5 seconds
+const WARMUP_RETRY_MAX_DELAY_MS = 30_000; // cap at 30 seconds
+
+/** Returns true for transient server-side errors that may resolve on retry (5xx, connection reset). */
+function isWarmupRetryableError(err: unknown): boolean {
+  const fe = coerceToFailoverError(err);
+  return fe?.reason === "timeout";
+}
 
 /**
  * Structured error thrown when all model fallback candidates have been
@@ -397,45 +410,69 @@ async function runFallbackCandidate<T>(params: {
   onDeferredSessionSuspension?: (params: SessionSuspensionParams) => void;
   attribution?: FailoverAttribution;
   abortSignal?: AbortSignal;
+  /** Timestamp (Date.now()) until which transient 5xx errors are retried. */
+  warmupRetryDeadline?: number;
 }): Promise<{ ok: true; result: T } | { ok: false; error: unknown }> {
-  try {
-    const run = () =>
-      params.options
-        ? params.run(params.provider, params.model, params.options)
-        : params.run(params.provider, params.model);
-    const result = params.deferSessionSuspension
-      ? await runWithDeferredSessionSuspension(run, params.onDeferredSessionSuspension)
-      : await run();
-    return {
-      ok: true,
-      result,
-    };
-  } catch (err) {
-    if (isCommandLaneTaskTimeoutError(err)) {
-      throw err;
+  let delayMs = WARMUP_RETRY_INITIAL_DELAY_MS;
+  let warmupAttempt = 0;
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    try {
+      const run = () =>
+        params.options
+          ? params.run(params.provider, params.model, params.options)
+          : params.run(params.provider, params.model);
+      const result = params.deferSessionSuspension
+        ? await runWithDeferredSessionSuspension(run, params.onDeferredSessionSuspension)
+        : await run();
+      return {
+        ok: true,
+        result,
+      };
+    } catch (err) {
+      if (isCommandLaneTaskTimeoutError(err)) {
+        throw err;
+      }
+      const fallbackError = resolveModelFallbackError(err, {
+        provider: params.provider,
+        model: params.model,
+        sessionId: params.attribution?.sessionId,
+        lane: params.attribution?.lane,
+      });
+      if (fallbackError.kind === "coordination") {
+        throw err;
+      }
+      if (isTerminalAbort(params.abortSignal) || isCallerAbortSignal(params.abortSignal)) {
+        throw err;
+      }
+      if (isAgentRunDirectAbortReason(err) || isAgentRunRestartAbortReason(err)) {
+        throw err;
+      }
+      if (isTerminalAbortFromError(err)) {
+        throw err;
+      }
+      const resolvedError = fallbackError.kind === "failover" ? fallbackError.error : err;
+
+      // Retry transient 5xx (e.g. 503 "Loading model" cold-start) until deadline.
+      const remaining = (params.warmupRetryDeadline ?? 0) - Date.now();
+      if (remaining > 2_000 && isWarmupRetryableError(resolvedError)) {
+        warmupAttempt += 1;
+        const actualDelay = Math.min(delayMs, remaining - 1_000);
+        const errMsg = err instanceof Error ? err.message : String(err);
+        log.info(
+          `${params.provider}/${params.model} warmup retry ${warmupAttempt} in ${actualDelay}ms: ${errMsg}`,
+        );
+        await sleep(actualDelay);
+        delayMs = Math.min(delayMs * 2, WARMUP_RETRY_MAX_DELAY_MS);
+        continue;
+      }
+
+      return {
+        ok: false,
+        error: resolvedError,
+      };
     }
-    const fallbackError = resolveModelFallbackError(err, {
-      provider: params.provider,
-      model: params.model,
-      sessionId: params.attribution?.sessionId,
-      lane: params.attribution?.lane,
-    });
-    if (fallbackError.kind === "coordination") {
-      throw err;
-    }
-    if (isTerminalAbort(params.abortSignal) || isCallerAbortSignal(params.abortSignal)) {
-      throw err;
-    }
-    if (isAgentRunDirectAbortReason(err) || isAgentRunRestartAbortReason(err)) {
-      throw err;
-    }
-    if (isTerminalAbortFromError(err)) {
-      throw err;
-    }
-    return {
-      ok: false,
-      error: fallbackError.kind === "failover" ? fallbackError.error : err,
-    };
   }
 }
 
@@ -452,6 +489,7 @@ async function runFallbackAttempt<T>(params: {
   total: number;
   attribution?: FailoverAttribution;
   abortSignal?: AbortSignal;
+  warmupRetryDeadline?: number;
 }): Promise<
   | { success: ModelFallbackRunResult<T> }
   | {
@@ -469,6 +507,7 @@ async function runFallbackAttempt<T>(params: {
     onDeferredSessionSuspension: params.onDeferredSessionSuspension,
     attribution: params.attribution,
     abortSignal: params.abortSignal,
+    warmupRetryDeadline: params.warmupRetryDeadline,
   });
   if (runResult.ok) {
     const classification = await params.classifyResult?.({
@@ -1380,6 +1419,11 @@ type RunWithModelFallbackParams<T> = {
   mergeExhaustedResult?: (params: { latestResult: T; preferredResult: T }) => T;
   skipAuthProfileRuntime?: boolean;
   abortSignal?: AbortSignal;
+  /**
+   * Max time in ms to retry transient 5xx errors (e.g. 503 "Loading model") per candidate
+   * before giving up and moving to the next fallback. Defaults to WARMUP_RETRY_MAX_MS (5 min).
+   */
+  warmupRetryMaxMs?: number;
 } & ModelManifestNormalizationContext;
 
 type DeferredSessionSuspensionState = {
@@ -1501,6 +1545,9 @@ async function runWithModelFallbackInternal<T>(
 
   const hasFallbackCandidates = candidates.length > 1;
   const requestedCandidate = candidates[0];
+  // Deadline is shared across all candidates: if the primary is still warming up after 5 min,
+  // we don't retry fallbacks as well (the full budget is consumed by the primary).
+  const warmupRetryDeadline = Date.now() + (params.warmupRetryMaxMs ?? WARMUP_RETRY_MAX_MS);
 
   for (let i = 0; i < candidates.length; i += 1) {
     const candidate = candidates.at(i);
@@ -1776,6 +1823,7 @@ async function runWithModelFallbackInternal<T>(
       total: candidates.length,
       attribution: { sessionId: params.sessionId, lane: params.lane },
       abortSignal: params.abortSignal,
+      warmupRetryDeadline,
     });
     if ("success" in attemptRun) {
       if (i > 0 || attempts.length > 0 || attemptedDuringCooldown) {
