@@ -15,12 +15,67 @@ RUN --mount=type=cache,id=openclaw-sandbox-bookworm-apt-cache,target=/var/cache/
     git \
     jq \
     python3 \
-    ripgrep
+    ripgrep \
+    # Desktop GUI (Xvnc + fluxbox + websockify, no GPU required)
+    tigervnc-standalone-server \
+    fluxbox \
+    xterm \
+    websockify \
+    dbus-x11 \
+    x11-utils \
+    xfonts-base \
+    x11-xserver-utils \
+    feh \
+    xdotool \
+    scrot \
+    xclip \
+    idesk \
+    # Browser automation
+    chromium \
+    chromium-driver \
+    python3-pip \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    socat \
+    # CloakBrowser dependencies (X11 libs needed for headed mode)
+    libgtk-3-0 \
+    libatk-bridge2.0-0 \
+    libdrm2 \
+    libxss1 \
+    libasound2 \
+    libnspr4 \
+    libnss3 \
+    libgbm1 \
+  && pip3 install --break-system-packages selenium cloakbrowser \
+  && rm -rf /var/lib/apt/lists/*
 
 # Prefer IPv4 over IPv6 — Docker bridge has no IPv6 connectivity
 RUN echo 'precedence ::ffff:0:0/96  100' >> /etc/gai.conf
 
+# GUI control helper scripts (used by AI agent to interact with VNC desktop)
+RUN set -e && \
+  printf '#!/bin/bash\nexport DISPLAY=:1\nOUT="${1:-/tmp/screen.png}"\nscrot -o "$OUT" 2>/dev/null\necho "$OUT"\n' > /usr/local/bin/gui-screenshot && \
+  printf '#!/bin/bash\nexport DISPLAY=:1\nxdotool mousemove "$1" "$2" && xdotool click "${3:-1}"\necho "Clicked at $1,$2"\n' > /usr/local/bin/gui-click && \
+  printf '#!/bin/bash\nexport DISPLAY=:1\nxdotool type --delay "${2:-50}" -- "$1"\necho "Typed: $1"\n' > /usr/local/bin/gui-type && \
+  printf '#!/bin/bash\nexport DISPLAY=:1\nxdotool key -- "$1"\necho "Key: $1"\n' > /usr/local/bin/gui-key && \
+  printf '#!/bin/bash\nexport DISPLAY=:1\nWID=$(xdotool search --name "$1" | head -1)\nif [ -n "$WID" ]; then xdotool windowactivate "$WID"; echo "Focused: $1"; else echo "Not found: $1"; fi\n' > /usr/local/bin/gui-focus && \
+  printf '#!/bin/bash\nexport DISPLAY=:1\necho "=== Screen ==="\nxdpyinfo 2>/dev/null | grep "dimensions:" || echo "unknown"\necho "=== Mouse ==="\nxdotool getmouselocation 2>/dev/null\necho "=== Active Window ==="\nxdotool getactivewindow getwindowname 2>/dev/null || echo "none"\necho "=== Windows ==="\nxdotool search --name "" getwindowname 2>/dev/null | sort -u\n' > /usr/local/bin/gui-info && \
+  printf '#!/bin/bash\nexport DISPLAY=:1\nif command -v cloakserve >/dev/null 2>&1; then python3 -c "from cloakbrowser import launch; b=launch(headless=False); p=b.new_page(); p.goto(\"$1\"); import time; time.sleep(999999)" &\nelse chromium --no-sandbox --no-first-run --disable-gpu --disable-dev-shm-usage --user-data-dir=/tmp/chromium-profile "$1" &\nfi\necho "Opened: $1"\n' > /usr/local/bin/gui-open && \
+  chmod +x /usr/local/bin/gui-*
+
 RUN useradd --create-home --shell /bin/bash sandbox
+
+# Install CloakBrowser binary as sandbox user (~200MB stealth Chromium)
+USER sandbox
+RUN python3 -m cloakbrowser install
+USER root
+
+# Symlink CloakBrowser binary and create cloakserve launcher
+RUN CLOAK_BIN="/home/sandbox/.cloakbrowser/chromium-145.0.7632.159.7/chrome" && \
+    ln -sf "$CLOAK_BIN" /usr/local/bin/cloakbrowser-bin 2>/dev/null; \
+    printf '#!/bin/bash\nexport DISPLAY=${DISPLAY:-:1}\nBIN=/usr/local/bin/cloakbrowser-bin\n[ -x "$BIN" ] || BIN=/usr/bin/chromium\nexec "$BIN" --no-sandbox --no-first-run --disable-gpu --disable-dev-shm-usage --disable-crash-reporter --remote-debugging-port=9222 --window-size=1920,1080 "$@"\n' > /usr/local/bin/cloakserve && \
+    chmod +x /usr/local/bin/cloakserve
+
 USER sandbox
 WORKDIR /home/sandbox
 
