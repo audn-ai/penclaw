@@ -690,12 +690,16 @@ export function attachGatewayWsMessageHandler(params: {
           authOk,
           authMethod,
         });
-        const skipPairing = shouldSkipControlUiPairing(
-          controlUiAuthPolicy,
-          role,
-          trustedProxyAuthOk,
-          resolvedAuth.mode,
-        );
+        const skipPairing =
+          shouldSkipControlUiPairing(
+            controlUiAuthPolicy,
+            role,
+            trustedProxyAuthOk,
+            resolvedAuth.mode,
+          ) ||
+          // Skip pairing for any token-authenticated client when device auth is disabled in config
+          (configSnapshot.gateway?.controlUi?.dangerouslyDisableDeviceAuth === true &&
+            authOk);
         if (device && devicePublicKey && !skipPairing) {
           const formatAuditList = (items: string[] | undefined): string => {
             if (!items || items.length === 0) {
