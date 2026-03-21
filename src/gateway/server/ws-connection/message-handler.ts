@@ -760,7 +760,11 @@ export function attachGatewayWsMessageHandler(params: {
             hasBrowserOriginHeader,
             sharedAuthOk,
             authMethod,
-          }) || shouldSkipControlUiPairing(controlUiAuthPolicy, sharedAuthOk, trustedProxyAuthOk);
+          }) ||
+          shouldSkipControlUiPairing(controlUiAuthPolicy, sharedAuthOk, trustedProxyAuthOk) ||
+          // Skip pairing for any token-authenticated client when device auth is disabled in config
+          (configSnapshot.gateway?.controlUi?.dangerouslyDisableDeviceAuth === true &&
+            sharedAuthOk);
         if (device && devicePublicKey && !skipPairing) {
           const formatAuditList = (items: string[] | undefined): string => {
             if (!items || items.length === 0) {
