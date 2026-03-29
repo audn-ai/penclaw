@@ -834,6 +834,8 @@ function buildOpenClawChromeLaunchArgs(params: {
   if (headlessMode.headless) {
     args.push("--headless=new");
     args.push("--disable-gpu");
+  } else if (process.platform === "linux" && process.env.DISPLAY) {
+    args.push("--ozone-platform=x11");
   }
   if (resolved.noSandbox) {
     args.push("--no-sandbox");
