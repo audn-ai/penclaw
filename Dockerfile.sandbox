@@ -73,7 +73,7 @@ USER root
 # Symlink CloakBrowser binary and create cloakserve launcher
 RUN CLOAK_BIN="/home/sandbox/.cloakbrowser/chromium-145.0.7632.159.7/chrome" && \
     ln -sf "$CLOAK_BIN" /usr/local/bin/cloakbrowser-bin 2>/dev/null; \
-    printf '#!/bin/bash\nexport DISPLAY=${DISPLAY:-:1}\nBIN=/usr/local/bin/cloakbrowser-bin\n[ -x "$BIN" ] || BIN=/usr/bin/chromium\nexec "$BIN" --no-sandbox --no-first-run --disable-gpu --disable-dev-shm-usage --disable-crash-reporter --remote-debugging-port=9222 --window-size=1920,1080 "$@"\n' > /usr/local/bin/cloakserve && \
+    printf '#!/bin/bash\nexport DISPLAY=${DISPLAY:-:1}\nexec /usr/bin/chromium --no-sandbox --no-first-run --disable-gpu --disable-dev-shm-usage --disable-crash-reporter --remote-debugging-port=9222 --window-size=1920,1080 --ozone-platform=x11 "$@"\n' > /usr/local/bin/cloakserve && \
     chmod +x /usr/local/bin/cloakserve
 
 USER sandbox
