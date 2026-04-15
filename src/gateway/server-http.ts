@@ -56,8 +56,10 @@ import {
 } from "./hooks.js";
 import { sendGatewayAuthFailure, setDefaultSecurityHeaders } from "./http-common.js";
 import { getBearerToken } from "./http-utils.js";
+import { JobsStore } from "./jobs-store.js";
 import { handleOpenAiModelsHttpRequest } from "./models-http.js";
 import { resolveRequestClientIp } from "./net.js";
+import { makeOpenAiJobsHttpHandler, type JobRunner } from "./openai-http-jobs.js";
 import { handleOpenAiHttpRequest } from "./openai-http.js";
 import { handleOpenResponsesHttpRequest } from "./openresponses-http.js";
 import { DEDUPE_MAX, DEDUPE_TTL_MS } from "./server-constants.js";
@@ -776,6 +778,37 @@ export function createGatewayHttpServer(opts: {
     getReadiness,
   } = opts;
   const openAiCompatEnabled = openAiChatCompletionsEnabled || openResponsesEnabled;
+
+  // Async /v1/jobs store + runner. We create the store lazily once per
+  // gateway process. The runner is an adapter that drives the existing
+  // buffered completion path, so /v1/jobs is a strict superset of
+  // /v1/chat/completions — same inputs, just async and pollable.
+  const jobsStateDir = process.env.OPENCLAW_JOBS_STATE_DIR || null;
+  const jobsStore = new JobsStore({ stateDir: jobsStateDir });
+  jobsStore.startSweeper();
+  const jobsRunner: JobRunner = async (ctx) => {
+    // Rebuild a synthetic request and call the same buffered handler the
+    // existing /v1/chat/completions route uses, via an in-process fetch to
+    // avoid duplicating the prompt/image pipeline logic in this file. We
+    // delegate to a small helper to keep this file short.
+    const { runChatCompletionForJob } = await import("./openai-http-jobs-runner.js");
+    return runChatCompletionForJob({
+      request: ctx.request,
+      abortSignal: ctx.abortSignal,
+      jobId: ctx.jobId,
+      authHeader: ctx.authHeader,
+      openAiChatCompletionsConfig,
+      resolvedAuth,
+      rateLimiter,
+    });
+  };
+  const handleOpenAiJobsHttpRequest = makeOpenAiJobsHttpHandler({
+    store: jobsStore,
+    runner: jobsRunner,
+    auth: resolvedAuth,
+    rateLimiter,
+  });
+
   const httpServer: HttpServer = opts.tlsOptions
     ? createHttpsServer(opts.tlsOptions, (req, res) => {
         void handleRequest(req, res);
@@ -899,6 +932,11 @@ export function createGatewayHttpServer(opts: {
               allowRealIpFallback,
               rateLimiter,
             }),
+        });
+        // Async /v1/jobs endpoints — companion route to /v1/chat/completions.
+        requestStages.push({
+          name: "openai-jobs",
+          run: () => handleOpenAiJobsHttpRequest(req, res),
         });
       }
       if (canvasHost) {

@@ -386,6 +386,12 @@ export function buildSandboxCreateArgs(params: {
   for (const cap of params.cfg.capDrop) {
     args.push("--cap-drop", cap);
   }
+  for (const cap of params.cfg.capAdd ?? []) {
+    args.push("--cap-add", cap);
+  }
+  for (const dev of params.cfg.devices ?? []) {
+    args.push("--device", dev);
+  }
   args.push("--security-opt", "no-new-privileges");
   if (params.cfg.seccompProfile) {
     args.push("--security-opt", `seccomp=${params.cfg.seccompProfile}`);

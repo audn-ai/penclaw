@@ -17,6 +17,10 @@ export type SandboxDockerSettings = {
   user?: string;
   /** Drop Linux capabilities. */
   capDrop?: string[];
+  /** Add Linux capabilities (e.g. NET_ADMIN for VPN). */
+  capAdd?: string[];
+  /** Pass host devices into the container (e.g. /dev/ppp:/dev/ppp). */
+  devices?: string[];
   /** Extra environment variables for sandbox exec. */
   env?: Record<string, string>;
   /** Optional setup command run once after container creation (array entries are joined by newline). */
