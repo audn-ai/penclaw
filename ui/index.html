@@ -10,75 +10,129 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <!-- Mixpanel Analytics -->
     <script type="text/javascript">
-    (function(f, b) {
-      if (!b.__SV) {
-        var e, g, i, h;
-        window.mixpanel = b;
-        b._i = [];
-        b.init = function(e, f, c) {
-          function g(a, d) {
-            var b = d.split(".");
-            2 == b.length && ((a = a[b[0]]), (d = b[1]));
-            a[d] = function() { a.push([d].concat(Array.prototype.slice.call(arguments, 0))); };
-          }
-          var a = b;
-          "undefined" !== typeof c ? (a = b[c] = []) : (c = "mixpanel");
-          a.people = a.people || [];
-          a.toString = function(a) { var d = "mixpanel"; "mixpanel" !== c && (d += "." + c); a || (d += " (stub)"); return d; };
-          a.people.toString = function() { return a.toString(1) + ".people (stub)"; };
-          i = "disable time_event track track_pageview track_links track_forms track_with_groups add_group set_group remove_group register register_once alias unregister identify name_tag set_config reset opt_in_tracking opt_out_tracking has_opted_in_tracking has_opted_out_tracking clear_opt_in_out_tracking start_batch_senders people.set people.set_once people.unset people.increment people.append people.union people.track_charge people.clear_charges people.delete_user people.remove".split(" ");
-          for (h = 0; h < i.length; h++) g(a, i[h]);
-          var j = "set set_once union unset remove delete".split(" ");
-          a.get_group = function() {
-            function b(c) { d[c] = function() { call2_args = arguments; call2 = [c].concat(Array.prototype.slice.call(call2_args, 0)); a.push([e, call2]); }; }
-            for (var d = {}, e = ["get_group"].concat(Array.prototype.slice.call(arguments, 0)), c = 0; c < j.length; c++) b(j[c]);
-            return d;
-          };
-          b._i.push([e, f, c]);
-        };
-        b.__SV = 1.2;
-        e = f.createElement("script");
-        e.type = "text/javascript";
-        e.async = !0;
-        e.src = "https://cdn.mxpnl.com/libs/mixpanel-2-latest.min.js";
-        g = f.getElementsByTagName("script")[0];
-        g.parentNode.insertBefore(e, g);
-      }
-    })(document, window.mixpanel || []);
-    mixpanel.init("a0d2f94cdd0da73c1453ebf7b87a5e0f", {api_host: "https://api-eu.mixpanel.com", track_pageview: true, persistence: "localStorage", autocapture: true, record_sessions_percent: 100, record_mask_all_text: false, record_mask_all_inputs: false, record_block_selector: "", record_heatmap_data: true});
-    // Identify user from PenClaw session
-    (function() {
-      try {
-        fetch('/api/me', { credentials: 'same-origin' })
-          .then(function(r) { return r.ok ? r.json() : null; })
-          .then(function(u) {
-            if (u && u.id) {
-              mixpanel.identify(u.id);
-              mixpanel.people.set({ '$name': u.name || '', '$email': u.email || '', subscription_status: u.subscription_status || 'none' });
-              mixpanel.register({ user_id: u.id, page_type: 'control_ui' });
+      (function (f, b) {
+        if (!b.__SV) {
+          var e, g, i, h;
+          window.mixpanel = b;
+          b._i = [];
+          b.init = function (e, f, c) {
+            function g(a, d) {
+              var b = d.split(".");
+              2 == b.length && ((a = a[b[0]]), (d = b[1]));
+              a[d] = function () {
+                a.push([d].concat(Array.prototype.slice.call(arguments, 0)));
+              };
             }
-          }).catch(function() {});
-      } catch(e) {}
-    })();
+            var a = b;
+            "undefined" !== typeof c ? (a = b[c] = []) : (c = "mixpanel");
+            a.people = a.people || [];
+            a.toString = function (a) {
+              var d = "mixpanel";
+              "mixpanel" !== c && (d += "." + c);
+              a || (d += " (stub)");
+              return d;
+            };
+            a.people.toString = function () {
+              return a.toString(1) + ".people (stub)";
+            };
+            i =
+              "disable time_event track track_pageview track_links track_forms track_with_groups add_group set_group remove_group register register_once alias unregister identify name_tag set_config reset opt_in_tracking opt_out_tracking has_opted_in_tracking has_opted_out_tracking clear_opt_in_out_tracking start_batch_senders people.set people.set_once people.unset people.increment people.append people.union people.track_charge people.clear_charges people.delete_user people.remove".split(
+                " ",
+              );
+            for (h = 0; h < i.length; h++) g(a, i[h]);
+            var j = "set set_once union unset remove delete".split(" ");
+            a.get_group = function () {
+              function b(c) {
+                d[c] = function () {
+                  call2_args = arguments;
+                  call2 = [c].concat(Array.prototype.slice.call(call2_args, 0));
+                  a.push([e, call2]);
+                };
+              }
+              for (
+                var d = {},
+                  e = ["get_group"].concat(Array.prototype.slice.call(arguments, 0)),
+                  c = 0;
+                c < j.length;
+                c++
+              )
+                b(j[c]);
+              return d;
+            };
+            b._i.push([e, f, c]);
+          };
+          b.__SV = 1.2;
+          e = f.createElement("script");
+          e.type = "text/javascript";
+          e.async = !0;
+          e.src = "https://cdn.mxpnl.com/libs/mixpanel-2-latest.min.js";
+          g = f.getElementsByTagName("script")[0];
+          g.parentNode.insertBefore(e, g);
+        }
+      })(document, window.mixpanel || []);
+      mixpanel.init("a0d2f94cdd0da73c1453ebf7b87a5e0f", {
+        api_host: "https://api-eu.mixpanel.com",
+        track_pageview: true,
+        persistence: "localStorage",
+        autocapture: true,
+        record_sessions_percent: 100,
+        record_mask_all_text: false,
+        record_mask_all_inputs: false,
+        record_block_selector: "",
+        record_heatmap_data: true,
+      });
+      // Identify user from PenClaw session
+      (function () {
+        try {
+          fetch("/api/me", { credentials: "same-origin" })
+            .then(function (r) {
+              return r.ok ? r.json() : null;
+            })
+            .then(function (u) {
+              if (u && u.id) {
+                mixpanel.identify(u.id);
+                mixpanel.people.set({
+                  $name: u.name || "",
+                  $email: u.email || "",
+                  subscription_status: u.subscription_status || "none",
+                });
+                mixpanel.register({ user_id: u.id, page_type: "control_ui" });
+              }
+            })
+            .catch(function () {});
+        } catch (e) {}
+      })();
     </script>
     <!-- LinkedIn Insight Tag -->
     <script type="text/javascript">
-    _linkedin_partner_id = "8961849";
-    window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
-    window._linkedin_data_partner_ids.push(_linkedin_partner_id);
+      _linkedin_partner_id = "8961849";
+      window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+      window._linkedin_data_partner_ids.push(_linkedin_partner_id);
     </script>
     <script type="text/javascript">
-    (function(l) {
-    if (!l){window.lintrk = function(a,b){window.lintrk.q.push([a,b])};
-    window.lintrk.q=[]}
-    var s = document.getElementsByTagName("script")[0];
-    var b = document.createElement("script");
-    b.type = "text/javascript";b.async = true;
-    b.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
-    s.parentNode.insertBefore(b, s);})(window.lintrk);
+      (function (l) {
+        if (!l) {
+          window.lintrk = function (a, b) {
+            window.lintrk.q.push([a, b]);
+          };
+          window.lintrk.q = [];
+        }
+        var s = document.getElementsByTagName("script")[0];
+        var b = document.createElement("script");
+        b.type = "text/javascript";
+        b.async = true;
+        b.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
+        s.parentNode.insertBefore(b, s);
+      })(window.lintrk);
     </script>
     <noscript>
-    <img height="1" width="1" style="display:none;" alt="" src="https://px.ads.linkedin.com/collect/?pid=8961849&fmt=gif" />
+      <img
+        height="1"
+        width="1"
+        style="display: none"
+        alt=""
+        src="https://px.ads.linkedin.com/collect/?pid=8961849&fmt=gif"
+      />
     </noscript>
     <script>
       (function () {
