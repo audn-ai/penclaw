@@ -594,6 +594,27 @@ export async function runGatewayCommand(opts: GatewayRunOpts, hooks: GatewayRunR
   const { clearGatewayRunConfigEnvironment } = await import("./pre-bootstrap.js");
   clearGatewayRunConfigEnvironment();
   installQaParentWatchdog();
+  // Install process-level guards so transient upstream/model errors
+  // cannot take the entire gateway down. The platform-side supervisor
+  // (lib/instances.js) remains the safety net for genuinely fatal states.
+  if (!process.listenerCount("uncaughtException")) {
+    process.on("uncaughtException", (err) => {
+      // eslint-disable-next-line no-console
+      console.error(
+        "[gateway] uncaughtException:",
+        err instanceof Error ? err.stack || err.message : String(err),
+      );
+    });
+  }
+  if (!process.listenerCount("unhandledRejection")) {
+    process.on("unhandledRejection", (reason) => {
+      // eslint-disable-next-line no-console
+      console.error(
+        "[gateway] unhandledRejection:",
+        reason instanceof Error ? reason.stack || reason.message : String(reason),
+      );
+    });
+  }
   const isDevProfile = normalizeOptionalLowercaseString(process.env.OPENCLAW_PROFILE) === "dev";
   const devMode = Boolean(opts.dev) || isDevProfile;
   if (opts.reset && !devMode) {
