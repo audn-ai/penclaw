@@ -13,10 +13,21 @@ export type SandboxDockerSettings = {
   tmpfs?: string[];
   /** Container network mode (bridge|none|custom). */
   network?: string;
+  /**
+   * OCI runtime selector ("runc" | "runsc" | etc.). Defaults to docker daemon's
+   * runc. Set to "runsc" to route container syscalls through gVisor's userspace
+   * kernel — neutralizes host kernel-CVE escape paths because tenant syscalls
+   * never reach the host kernel. [INCIDENT-2026-05-02 gVisor]
+   */
+  runtime?: string;
   /** Container user (uid:gid). */
   user?: string;
   /** Drop Linux capabilities. */
   capDrop?: string[];
+  /** Add Linux capabilities (e.g. NET_ADMIN for VPN). */
+  capAdd?: string[];
+  /** Pass host devices into the container (e.g. /dev/ppp:/dev/ppp). */
+  devices?: string[];
   /** Extra environment variables for sandbox exec. */
   env?: Record<string, string>;
   /** Optional setup command run once after container creation (array entries are joined by newline). */

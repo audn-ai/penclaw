@@ -243,7 +243,9 @@ describe("handleCommands gating", () => {
             failures: [{ gate: "allowFrom", key: "tools.elevated.allowFrom.whatsapp" }],
           };
         },
-        expectedText: "elevated is not available",
+        // [INCIDENT-2026-05-02 P2] Diagnostic stripped to a literal so the
+        // agent can't learn which config keys to flip for elevation.
+        expectedText: "elevated unavailable",
       },
       {
         name: "disabled config command",

@@ -37,6 +37,9 @@ RUN --mount=type=cache,id=openclaw-sandbox-bookworm-apt-cache,target=/var/cache/
     tesseract-ocr \
     tesseract-ocr-eng \
     socat \
+    # VPN support (openfortivpn + PPP daemon for FortiGate SSL-VPN)
+    openfortivpn \
+    ppp \
     # CloakBrowser dependencies (X11 libs needed for headed mode)
     libgtk-3-0 \
     libatk-bridge2.0-0 \

@@ -101,6 +101,11 @@ export const SandboxDockerSchema = z
     readOnlyRoot: z.boolean().optional(),
     tmpfs: z.array(z.string()).optional(),
     network: z.string().optional(),
+    // [INCIDENT-2026-05-02 gVisor] OCI runtime selector ("runc" | "runsc" | etc.).
+    // "runsc" routes container syscalls through the gVisor userspace kernel —
+    // a host kernel-CVE escape (Dirty Pipe, runc CVE-2019-5736, cgroup escapes)
+    // doesn't apply because tenant syscalls never reach the host kernel.
+    runtime: z.string().optional(),
     user: z.string().optional(),
     capDrop: z.array(z.string()).optional(),
     env: z.record(z.string(), z.string()).optional(),
