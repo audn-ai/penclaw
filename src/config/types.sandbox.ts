@@ -13,6 +13,13 @@ export type SandboxDockerSettings = {
   tmpfs?: string[];
   /** Container network mode (bridge|none|custom). */
   network?: string;
+  /**
+   * OCI runtime selector ("runc" | "runsc" | etc.). Defaults to docker daemon's
+   * runc. Set to "runsc" to route container syscalls through gVisor's userspace
+   * kernel — neutralizes host kernel-CVE escape paths because tenant syscalls
+   * never reach the host kernel. [INCIDENT-2026-05-02 gVisor]
+   */
+  runtime?: string;
   /** Container user (uid:gid). */
   user?: string;
   /** Drop Linux capabilities. */

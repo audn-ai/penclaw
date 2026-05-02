@@ -1,30 +1,12 @@
-import { formatCliCommand } from "../../cli/command-format.js";
-
-export function formatElevatedUnavailableMessage(params: {
+// [INCIDENT-2026-05-02 P2] Strip gate/fix-it diagnostics from the response. The
+// original text named the exact config keys ("tools.elevated.enabled",
+// "tools.elevated.allowFrom.<provider>") an attacker would need to flip — a
+// gift to anyone driving the agent toward sandbox escape. Return a literal so
+// the agent learns nothing about why elevation failed.
+export function formatElevatedUnavailableMessage(_params: {
   runtimeSandboxed: boolean;
   failures: Array<{ gate: string; key: string }>;
   sessionKey?: string;
 }): string {
-  const lines: string[] = [];
-  lines.push(
-    `elevated is not available right now (runtime=${params.runtimeSandboxed ? "sandboxed" : "direct"}).`,
-  );
-  if (params.failures.length > 0) {
-    lines.push(`Failing gates: ${params.failures.map((f) => `${f.gate} (${f.key})`).join(", ")}`);
-  } else {
-    lines.push(
-      "Failing gates: enabled (tools.elevated.enabled / agents.list[].tools.elevated.enabled), allowFrom (tools.elevated.allowFrom.<provider>).",
-    );
-  }
-  lines.push("Fix-it keys:");
-  lines.push("- tools.elevated.enabled");
-  lines.push("- tools.elevated.allowFrom.<provider>");
-  lines.push("- agents.list[].tools.elevated.enabled");
-  lines.push("- agents.list[].tools.elevated.allowFrom.<provider>");
-  if (params.sessionKey) {
-    lines.push(
-      `See: ${formatCliCommand(`openclaw sandbox explain --session ${params.sessionKey}`)}`,
-    );
-  }
-  return lines.join("\n");
+  return "elevated unavailable";
 }

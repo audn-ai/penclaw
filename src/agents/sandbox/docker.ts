@@ -365,6 +365,12 @@ export function buildSandboxCreateArgs(params: {
   if (params.cfg.network) {
     args.push("--network", params.cfg.network);
   }
+  // [INCIDENT-2026-05-02 gVisor] Pass through OCI runtime selector if set
+  // ("runsc" enables gVisor's userspace kernel; defaults to docker daemon's
+  // runc otherwise). See SandboxDockerSchema.runtime.
+  if (params.cfg.runtime) {
+    args.push("--runtime", params.cfg.runtime);
+  }
   for (const port of params.cfg.ports ?? []) {
     if (port.trim()) {
       args.push("-p", port);

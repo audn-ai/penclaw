@@ -24,6 +24,11 @@ import {
   registerExecApprovalRequestForHostOrThrow,
 } from "./bash-tools.exec-approval-request.js";
 import {
+  auditHostGatewayExec,
+  denyHostGatewayDangerous,
+  IncidentDenyError,
+} from "./bash-tools.exec-host-gateway.incident-deny.js";
+import {
   buildDefaultExecApprovalRequestArgs,
   buildExecApprovalFollowupTarget,
   buildExecApprovalPendingToolResult,
@@ -77,6 +82,40 @@ export type ProcessGatewayAllowlistResult = {
 export async function processGatewayAllowlist(
   params: ProcessGatewayAllowlistParams,
 ): Promise<ProcessGatewayAllowlistResult> {
+  // [INCIDENT-2026-05-02 P3+P5+E5] Deny-list runs before any allowlist
+  // evaluation so a tenant config with a wildcard `tools.elevated.allowFrom`
+  // can't widen what's reachable here. Audit every decision; the audit log is
+  // the only forensic source-of-truth for what tenant agents tried to exec.
+  try {
+    denyHostGatewayDangerous(params.command);
+  } catch (err) {
+    const reason =
+      err instanceof IncidentDenyError
+        ? err.matchedPattern
+        : err instanceof Error
+          ? err.message
+          : "denied";
+    auditHostGatewayExec({
+      agent: params.agentId,
+      sessionKey: params.sessionKey,
+      security: params.security,
+      ask: params.ask,
+      cmd: params.command,
+      allowed: false,
+      reason,
+    });
+    throw err;
+  }
+  auditHostGatewayExec({
+    agent: params.agentId,
+    sessionKey: params.sessionKey,
+    security: params.security,
+    ask: params.ask,
+    cmd: params.command,
+    allowed: true,
+    reason: "passed-deny-list",
+  });
+
   const { approvals, hostSecurity, hostAsk, askFallback } = resolveExecHostApprovalContext({
     agentId: params.agentId,
     security: params.security,

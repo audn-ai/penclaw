@@ -271,7 +271,13 @@ describe("directive behavior", () => {
       );
 
       const deniedText = replyText(deniedRes);
-      expect(deniedText).toContain("agents.list[].tools.elevated.allowFrom.whatsapp");
+      // [INCIDENT-2026-05-02 P2] Per-agent allowFrom denial used to leak the
+      // exact config key (`agents.list[].tools.elevated.allowFrom.whatsapp`)
+      // into the reply text. Now stripped to a literal so the agent can't
+      // learn what to flip. The denial path is still asserted via the
+      // `runEmbeddedPiAgentMock` not-called check below.
+      expect(deniedText).toContain("elevated unavailable");
+      expect(deniedText).not.toContain("tools.elevated.allowFrom");
 
       const allowedRes = await getReplyFromConfig(
         {
