@@ -1634,38 +1634,11 @@ export function createExecTool(
       const elevatedRequested = elevatedMode !== "off";
       if (elevatedRequested) {
         if (!elevatedDefaults?.enabled || !elevatedDefaults.allowed) {
-          const runtime = defaults?.sandbox ? "sandboxed" : "direct";
-          const gates: string[] = [];
-          const contextParts: string[] = [];
-          const provider = normalizeOptionalString(defaults?.messageProvider);
-          const sessionKey = normalizeOptionalString(defaults?.sessionKey);
-          if (provider) {
-            contextParts.push(`provider=${provider}`);
-          }
-          if (sessionKey) {
-            contextParts.push(`session=${sessionKey}`);
-          }
-          if (!elevatedDefaults?.enabled) {
-            gates.push("enabled (tools.elevated.enabled / agents.list[].tools.elevated.enabled)");
-          } else {
-            gates.push(
-              "allowFrom (tools.elevated.allowFrom.<provider> / agents.list[].tools.elevated.allowFrom.<provider>)",
-            );
-          }
-          throw new Error(
-            [
-              `elevated is not available right now (runtime=${runtime}).`,
-              `Failing gates: ${gates.join(", ")}`,
-              contextParts.length > 0 ? `Context: ${contextParts.join(" ")}` : undefined,
-              "Fix-it keys:",
-              "- tools.elevated.enabled",
-              "- tools.elevated.allowFrom.<provider>",
-              "- agents.list[].tools.elevated.enabled",
-              "- agents.list[].tools.elevated.allowFrom.<provider>",
-            ]
-              .filter(Boolean)
-              .join("\n"),
-          );
+          // [INCIDENT-2026-05-02 P2] Don't tell the agent which config keys
+          // would unlock elevation. Mirrors the
+          // `formatElevatedUnavailableMessage` rewrite in
+          // ../auto-reply/reply/elevated-unavailable.ts.
+          throw new Error("elevated unavailable");
         }
       }
       const requestedTarget = requireValidExecTarget(params.host);

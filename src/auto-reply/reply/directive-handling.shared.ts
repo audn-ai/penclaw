@@ -1,6 +1,8 @@
 // Shared directive parsing helpers used by model and auth directive handlers.
+// [INCIDENT-2026-05-02 P2] formatCliCommand import intentionally dropped: the
+// fix-it diagnostic that named elevation config keys was removed as sandbox-escape
+// information-disclosure hardening.
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
-import { formatCliCommand } from "../../cli/command-format.js";
 import { SESSION_MODEL_OVERRIDE_TRANSACTION_FIELDS } from "../../config/sessions/session-snapshot-merge.js";
 import type { SessionEntry } from "../../config/sessions/types.js";
 import { SYSTEM_MARK, prefixSystemMessage } from "../../infra/system-message.js";
@@ -155,27 +157,13 @@ export function enqueueModeSwitchEvents(params: {
   }
 }
 
-export function formatElevatedUnavailableText(params: {
+// [INCIDENT-2026-05-02 P2] Mirror of `formatElevatedUnavailableMessage`: strip
+// gate/fix-it details so the directive-handling reply does not hand the agent
+// the config keys to flip for sandbox escape. See ./elevated-unavailable.ts.
+export function formatElevatedUnavailableText(_params: {
   runtimeSandboxed: boolean;
   failures?: Array<{ gate: string; key: string }>;
   sessionKey?: string;
 }): string {
-  const lines: string[] = [];
-  lines.push(
-    `elevated is not available right now (runtime=${params.runtimeSandboxed ? "sandboxed" : "direct"}).`,
-  );
-  const failures = params.failures ?? [];
-  if (failures.length > 0) {
-    lines.push(`Failing gates: ${failures.map((f) => `${f.gate} (${f.key})`).join(", ")}`);
-  } else {
-    lines.push(
-      "Fix-it keys: tools.elevated.enabled, tools.elevated.allowFrom.<provider>, agents.list[].tools.elevated.*",
-    );
-  }
-  if (params.sessionKey) {
-    lines.push(
-      `See: ${formatCliCommand(`openclaw sandbox explain --session ${params.sessionKey}`)}`,
-    );
-  }
-  return lines.join("\n");
+  return "elevated unavailable";
 }
