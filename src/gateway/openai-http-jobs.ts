@@ -15,7 +15,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { AuthRateLimiter } from "./auth-rate-limit.js";
 import type { ResolvedGatewayAuth } from "./auth.js";
-import { authorizeGatewayBearerRequestOrReply } from "./http-auth-helpers.js";
+import { authorizeGatewayHttpRequestOrReply } from "./http-auth-utils.js";
 import { sendJson } from "./http-common.js";
 import type {
   JobErrorPayload,
@@ -176,7 +176,10 @@ export class JobsHandler {
       // Tests drive the handler without auth context.
       return true;
     }
-    return authorizeGatewayBearerRequestOrReply({
+    // Upstream renamed the bearer-auth helper; it now returns the resolved
+    // request auth on success or null after replying on failure. This handler
+    // only needs the boolean authorized/handled outcome.
+    const requestAuth = await authorizeGatewayHttpRequestOrReply({
       req,
       res,
       auth: this.auth,
@@ -184,6 +187,7 @@ export class JobsHandler {
       allowRealIpFallback: this.allowRealIpFallback,
       rateLimiter: this.rateLimiter,
     });
+    return requestAuth !== null;
   }
 
   /**
