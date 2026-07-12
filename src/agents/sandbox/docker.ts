@@ -509,7 +509,26 @@ async function createSandboxContainer(params: {
   args.push(cfg.image, "sleep", "infinity");
 
   await execDocker(args);
-  await execDocker(["start", name]);
+  // [penclaw patch 2026-06-01] gVisor/runsc teardown is slow: a just-removed sandbox can
+  // still hold this sandbox's deterministic published ports, so `docker start` fails with
+  // "address already in use" and the agent wrongly cascades to a model fallback. Self-heal:
+  // force-rm + recreate + retry with backoff until gVisor releases the port.
+  {
+    let started = false;
+    for (let attempt = 0; attempt < 6 && !started; attempt++) {
+      try {
+        await execDocker(["start", name]);
+        started = true;
+      } catch (err) {
+        const msg = String((err as { message?: string })?.message ?? err);
+        if (!/address already in use|port is already allocated|EADDRINUSE/i.test(msg)) throw err;
+        await execDocker(["rm", "-f", name], { allowFailure: true });
+        await new Promise((r) => setTimeout(r, 1500 + attempt * 1500));
+        await execDocker(args, { allowFailure: true });
+      }
+    }
+    if (!started) await execDocker(["start", name]);
+  }
 
   if (cfg.setupCommand?.trim()) {
     await execDocker(["exec", "-i", name, "/bin/sh", "-lc", cfg.setupCommand]);
