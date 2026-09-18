@@ -1,0 +1,100 @@
+diff --git a/dist/providers/openai-completions.js b/dist/providers/openai-completions.js
+index 7e3883f..618687f 100644
+--- a/dist/providers/openai-completions.js
++++ b/dist/providers/openai-completions.js
+@@ -53,7 +53,94 @@
+             if (nextParams !== undefined) {
+                 params = nextParams;
+             }
+-            const openaiStream = await client.chat.completions.create(params, { signal: options?.signal });
++            // [penclaw patch 2026-06-01] qwen36 vLLM now parses tool calls
++            // (--enable-auto-tool-choice --tool-call-parser qwen3_xml), so tools flow through.
++            // But Qwen3.6 defaults enable_thinking=true and burns the token budget reasoning
++            // before emitting the call (truncated/empty arguments). Force thinking off for the
++            // qwen36 base URL so tool calls complete. Railway (heavily quantized) is even worse:
++            // its "thinking" is long and eats the whole completion budget, so tool args come back
++            // truncated to EMPTY ('') with finish_reason=tool_calls -> "tool called without path"
++            // -> infinite retry loop. So Railway ALSO gets enable_thinking:false when tools present.
++            let _railwayNonStream = false;
++            try {
++              const _bu = String(model?.baseUrl || "");
++              if (_bu.includes("qwen36-vllm-vllm.audnprodstack")) {
++                if (params && typeof params === "object") {
++                  params.chat_template_kwargs = Object.assign({}, params.chat_template_kwargs, { enable_thinking: false });
++                }
++              } else if (_bu.includes("llm-platform-production-26af.up.railway.app")) {
++                // [penclaw patch 2026-06-02] Railway vLLM 400s on STREAMING tool calls
++                // ("auto tool choice requires --enable-auto-tool-choice"), but it DOES support
++                // tools NON-streaming — exactly how MetaClaw uses it (stream=false, then re-streams).
++                // So when tools are present, force non-streaming for Railway and re-wrap the single
++                // response into the streaming chunk shape the loop below consumes. Chat-only
++                // requests (no tools) keep true streaming.
++                if (params && typeof params === "object" && Array.isArray(params.tools) && params.tools.length > 0) {
++                  params.stream = false;
++                  delete params.stream_options;
++                  params.chat_template_kwargs = Object.assign({}, params.chat_template_kwargs, { enable_thinking: false });
++                  _railwayNonStream = true;
++                }
++              }
++            } catch {}
++            let openaiStream = await client.chat.completions.create(params, { signal: options?.signal });
++            if (_railwayNonStream) {
++              // Non-streaming create() returns a single ChatCompletion (choices[].message).
++              // Convert it to a one-item async iterable of ChatCompletionChunk (choices[].delta)
++              // so the streaming loop below — and finishCurrentBlock() after it — work unchanged.
++              let _completion = openaiStream;
++              // [penclaw patch 2026-06-02] Railway re-call-loop fix. The heavily-quantized
++              // model re-emits a tool call it ALREADY has a result for (instead of answering),
++              // so the agent loops forever. It *does* read tool results when tools aren't
++              // offered, so: if every tool_call in this response merely re-calls an
++              // already-resolved (same name+args, has a tool result) call, re-issue this turn
++              // WITHOUT tools to force the synthesized answer — mimicking the non-quantized model.
++              try {
++                const _tcs = _completion?.choices?.[0]?.message?.tool_calls || [];
++                const _msgs = Array.isArray(params?.messages) ? params.messages : [];
++                if (_tcs.length > 0 && _msgs.length > 0) {
++                  const _norm = (name, argstr) => {
++                    let a = argstr || "";
++                    try { const o = JSON.parse(a); a = JSON.stringify(o, Object.keys(o).sort()); } catch {}
++                    return (name || "") + "|" + a;
++                  };
++                  const _resolved = new Set();
++                  for (const m of _msgs) {
++                    if (m && m.role === "assistant" && Array.isArray(m.tool_calls)) {
++                      for (const tc of m.tool_calls) {
++                        const id = tc?.id;
++                        const hasResult = id && _msgs.some((x) => x && x.role === "tool" && x.tool_call_id === id);
++                        if (hasResult) _resolved.add(_norm(tc.function?.name, tc.function?.arguments));
++                      }
++                    }
++                  }
++                  const _allRecalls = _tcs.every((tc) => _resolved.has(_norm(tc.function?.name, tc.function?.arguments)));
++                  if (_allRecalls) {
++                    const _forced = Object.assign({}, params);
++                    delete _forced.tools;
++                    delete _forced.tool_choice;
++                    _forced.stream = false;
++                    _completion = await client.chat.completions.create(_forced, { signal: options?.signal });
++                  }
++                }
++              } catch {}
++              openaiStream = (async function* () {
++                yield {
++                  id: _completion?.id,
++                  usage: _completion?.usage,
++                  choices: (_completion?.choices || []).map((ch) => ({
++                    index: ch.index ?? 0,
++                    delta: {
++                      role: ch.message?.role,
++                      content: ch.message?.content ?? null,
++                      reasoning_content: ch.message?.reasoning_content,
++                      tool_calls: ch.message?.tool_calls,
++                    },
++                    finish_reason: ch.finish_reason ?? "stop",
++                  })),
++                };
++              })();
++            }
+             stream.push({ type: "start", partial: output });
+             let currentBlock = null;
+             const blocks = output.content;
