@@ -1,0 +1,20 @@
+import {
+  a as hasGatewayClientCap,
+  c as normalizeGatewayClientName,
+  i as GATEWAY_CLIENT_NAMES,
+  n as GATEWAY_CLIENT_IDS,
+  o as normalizeGatewayClientId,
+  r as GATEWAY_CLIENT_MODES,
+  s as normalizeGatewayClientMode,
+  t as GATEWAY_CLIENT_CAPS,
+} from "./client-info-Br1guPTt.js";
+export {
+  GATEWAY_CLIENT_CAPS,
+  GATEWAY_CLIENT_IDS,
+  GATEWAY_CLIENT_MODES,
+  GATEWAY_CLIENT_NAMES,
+  hasGatewayClientCap,
+  normalizeGatewayClientId,
+  normalizeGatewayClientMode,
+  normalizeGatewayClientName,
+};

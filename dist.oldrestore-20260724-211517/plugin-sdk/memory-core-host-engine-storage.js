@@ -1,0 +1,85 @@
+import { t as resolveMemoryBackendConfig } from "../backend-config-B4LH5mk9.js";
+import {
+  i as loadSqliteVecExtension,
+  n as configureMemorySqliteWalMaintenance,
+  r as requireMemoryHostNodeSqlite,
+  t as closeMemorySqliteWalMaintenance,
+} from "../engine-storage-DV2x5DKD.js";
+import { t as isFileMissingError } from "../fs-utils-urkAyyL8.js";
+import {
+  n as isTransientMemoryReadError,
+  r as retryTransientMemoryRead,
+  t as hashText,
+} from "../hash-DsDOoPhE.js";
+import {
+  a as ensureMemoryHostDir,
+  c as normalizeExtraMemoryPaths,
+  d as runMemoryHostTasksWithConcurrency,
+  i as cosineSimilarity,
+  l as parseEmbedding,
+  n as buildMultimodalChunkForIndexing,
+  r as chunkMarkdown,
+  s as listMemoryFiles,
+  t as buildFileEntry,
+  u as remapChunkLines,
+} from "../internal-Dd4OzKYD.js";
+import {
+  C as ensureMemoryIndexSchema,
+  S as dropMemoryPathFtsTriggers,
+  _ as MEMORY_INDEX_META_TABLE,
+  b as MEMORY_INDEX_STATE_TABLE,
+  g as MEMORY_INDEX_FTS_TABLE,
+  h as MEMORY_INDEX_CHUNKS_TABLE,
+  m as MEMORY_EMBEDDING_CACHE_TABLE,
+  v as MEMORY_INDEX_PATHS_FTS_TABLE,
+  w as ensureMemoryPathFtsTriggers,
+  x as MEMORY_INDEX_VECTOR_TABLE,
+  y as MEMORY_INDEX_SOURCES_TABLE,
+} from "../openclaw-agent-db-VC51jrBW.js";
+import {
+  a as buildMemoryReadResult,
+  i as DEFAULT_MEMORY_READ_MAX_CHARS,
+  n as readMemoryFile,
+  o as buildMemoryReadResultFromSlice,
+  r as DEFAULT_MEMORY_READ_LINES,
+} from "../read-file-B9SxqQrC.js";
+import { o as statRegularFile } from "../regular-file-CuvhUtZS.js";
+import "../memory-core-host-engine-storage-eNQx81fD.js";
+export {
+  DEFAULT_MEMORY_READ_LINES,
+  DEFAULT_MEMORY_READ_MAX_CHARS,
+  MEMORY_EMBEDDING_CACHE_TABLE,
+  MEMORY_INDEX_CHUNKS_TABLE,
+  MEMORY_INDEX_FTS_TABLE,
+  MEMORY_INDEX_META_TABLE,
+  MEMORY_INDEX_PATHS_FTS_TABLE,
+  MEMORY_INDEX_SOURCES_TABLE,
+  MEMORY_INDEX_STATE_TABLE,
+  MEMORY_INDEX_VECTOR_TABLE,
+  buildFileEntry,
+  buildMemoryReadResult,
+  buildMemoryReadResultFromSlice,
+  buildMultimodalChunkForIndexing,
+  chunkMarkdown,
+  closeMemorySqliteWalMaintenance,
+  configureMemorySqliteWalMaintenance,
+  cosineSimilarity,
+  dropMemoryPathFtsTriggers,
+  ensureMemoryHostDir as ensureDir,
+  ensureMemoryIndexSchema,
+  ensureMemoryPathFtsTriggers,
+  hashText,
+  isFileMissingError,
+  isTransientMemoryReadError,
+  listMemoryFiles,
+  loadSqliteVecExtension,
+  normalizeExtraMemoryPaths,
+  parseEmbedding,
+  readMemoryFile,
+  remapChunkLines,
+  requireMemoryHostNodeSqlite as requireNodeSqlite,
+  resolveMemoryBackendConfig,
+  retryTransientMemoryRead,
+  runMemoryHostTasksWithConcurrency as runWithConcurrency,
+  statRegularFile,
+};

@@ -1,0 +1,135 @@
+import {
+  m as readProviderJsonResponse,
+  n as asObject,
+  r as assertOkOrThrowHttpError,
+} from "./provider-http-errors-DLMRBkZU.js";
+import { c as postJsonRequest, p as resolveProviderHttpRequestConfig } from "./shared-CfGzzOqJ.js";
+import {
+  a as DEFAULT_VYDRA_VOICE_ID,
+  c as normalizeVydraBaseUrl,
+  m as trimToUndefined,
+  o as downloadVydraAsset,
+  r as DEFAULT_VYDRA_SPEECH_MODEL,
+  s as extractVydraResultUrls,
+  t as DEFAULT_VYDRA_BASE_URL,
+  u as resolveVydraGeneratedMediaMaxBytes,
+} from "./shared-CWLz3o_d.js";
+import "./speech-core-CWj6o89Y.js";
+import "./secret-input-D1aG0n6v.js";
+import "./provider-http-BDIltggC.js";
+import { f as normalizeResolvedSecretInputString } from "./types.secrets-BV0ywRAy.js";
+//#region extensions/vydra/speech-provider.ts
+const VYDRA_SPEECH_VOICES = [
+  {
+    id: DEFAULT_VYDRA_VOICE_ID,
+    name: "Rachel",
+  },
+];
+function normalizeVydraSpeechConfig(rawConfig) {
+  const raw = asObject(asObject(rawConfig.providers)?.vydra) ?? asObject(rawConfig.vydra);
+  return {
+    apiKey: normalizeResolvedSecretInputString({
+      value: raw?.apiKey,
+      path: "messages.tts.providers.vydra.apiKey",
+    }),
+    baseUrl: normalizeVydraBaseUrl(
+      trimToUndefined(raw?.baseUrl) ?? trimToUndefined(process.env.VYDRA_BASE_URL),
+    ),
+    model:
+      trimToUndefined(raw?.model) ??
+      trimToUndefined(process.env.VYDRA_TTS_MODEL) ??
+      "elevenlabs/tts",
+    voiceId:
+      trimToUndefined(raw?.voiceId) ??
+      trimToUndefined(process.env.VYDRA_TTS_VOICE_ID) ??
+      "21m00Tcm4TlvDq8ikWAM",
+  };
+}
+function readVydraSpeechConfig(config) {
+  const normalized = normalizeVydraSpeechConfig({});
+  return {
+    apiKey: trimToUndefined(config.apiKey) ?? normalized.apiKey,
+    baseUrl: normalizeVydraBaseUrl(trimToUndefined(config.baseUrl) ?? normalized.baseUrl),
+    model: trimToUndefined(config.model) ?? normalized.model,
+    voiceId: trimToUndefined(config.voiceId) ?? normalized.voiceId,
+  };
+}
+function readVydraOverrides(overrides) {
+  if (!overrides) return {};
+  return {
+    model: trimToUndefined(overrides.model),
+    voiceId: trimToUndefined(overrides.voiceId),
+  };
+}
+function buildVydraSpeechProvider() {
+  return {
+    id: "vydra",
+    label: "Vydra",
+    models: [DEFAULT_VYDRA_SPEECH_MODEL],
+    voices: VYDRA_SPEECH_VOICES.map((voice) => voice.id),
+    resolveConfig: ({ rawConfig }) => normalizeVydraSpeechConfig(rawConfig),
+    listVoices: async () => VYDRA_SPEECH_VOICES.map((voice) => Object.assign({}, voice)),
+    isConfigured: ({ providerConfig }) =>
+      Boolean(readVydraSpeechConfig(providerConfig).apiKey || process.env.VYDRA_API_KEY),
+    synthesize: async (req) => {
+      const config = readVydraSpeechConfig(req.providerConfig);
+      const overrides = readVydraOverrides(req.providerOverrides);
+      const apiKey = config.apiKey || process.env.VYDRA_API_KEY;
+      if (!apiKey) throw new Error("Vydra API key missing");
+      const fetchFn = fetch;
+      const { baseUrl, allowPrivateNetwork, headers, dispatcherPolicy } =
+        resolveProviderHttpRequestConfig({
+          baseUrl: config.baseUrl,
+          defaultBaseUrl: DEFAULT_VYDRA_BASE_URL,
+          allowPrivateNetwork: false,
+          defaultHeaders: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          provider: "vydra",
+          capability: "audio",
+          transport: "http",
+        });
+      const { response, release } = await postJsonRequest({
+        url: `${baseUrl}/models/${overrides.model ?? config.model}`,
+        headers,
+        body: {
+          text: req.text,
+          voice_id: overrides.voiceId ?? config.voiceId,
+        },
+        timeoutMs: req.timeoutMs,
+        fetchFn,
+        allowPrivateNetwork,
+        dispatcherPolicy,
+      });
+      try {
+        await assertOkOrThrowHttpError(response, "Vydra speech synthesis failed");
+        const audioUrl = extractVydraResultUrls(
+          await readProviderJsonResponse(response, "Vydra speech synthesis"),
+          "audio",
+        )[0];
+        if (!audioUrl) throw new Error("Vydra speech synthesis response missing audio URL");
+        const audio = await downloadVydraAsset({
+          url: audioUrl,
+          kind: "audio",
+          timeoutMs: req.timeoutMs,
+          fetchFn,
+          maxBytes: resolveVydraGeneratedMediaMaxBytes({
+            cfg: req.cfg,
+            kind: "audio",
+          }),
+        });
+        return {
+          audioBuffer: audio.buffer,
+          outputFormat: audio.mimeType.includes("wav") ? "wav" : "mp3",
+          fileExtension: audio.fileName.endsWith(".wav") ? ".wav" : ".mp3",
+          voiceCompatible: false,
+        };
+      } finally {
+        await release();
+      }
+    },
+  };
+}
+//#endregion
+export { buildVydraSpeechProvider as t };

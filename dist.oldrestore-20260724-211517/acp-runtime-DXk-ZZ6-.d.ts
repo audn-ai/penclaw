@@ -1,0 +1,14 @@
+import { t as AcpRuntimeBackend } from "./registry-CpUYxH9H.js";
+//#region src/plugin-sdk/acp-runtime.d.ts
+/** Lazy ACP test helper facade combining control-plane and runtime registry helpers. */
+declare const testing: {
+  resetAcpSessionManagerForTests(): void;
+  setAcpSessionManagerForTests(manager: unknown): void;
+} & {
+  resetAcpRuntimeBackendsForTests(): void;
+  getAcpRuntimeRegistryGlobalStateForTests(): {
+    backendsById: Map<string, AcpRuntimeBackend>;
+  };
+};
+//#endregion
+export { testing as t };

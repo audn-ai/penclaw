@@ -1,0 +1,14 @@
+import {
+  a as resolveTelegramCustomCommands,
+  i as normalizeTelegramCommandName,
+  n as getTelegramCommandNamePattern,
+  r as normalizeTelegramCommandDescription,
+  t as TELEGRAM_COMMAND_NAME_PATTERN,
+} from "../telegram-command-config-BlGkt4gX.js";
+export {
+  TELEGRAM_COMMAND_NAME_PATTERN,
+  getTelegramCommandNamePattern,
+  normalizeTelegramCommandDescription,
+  normalizeTelegramCommandName,
+  resolveTelegramCustomCommands,
+};

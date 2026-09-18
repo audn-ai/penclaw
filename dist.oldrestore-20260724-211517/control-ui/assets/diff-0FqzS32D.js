@@ -1,0 +1,17 @@
+import { n as e } from "./rolldown-runtime-DaJ6WEGw.js";
+var t, n;
+e(() => {
+  ((t = { "+": `inserted`, "-": `deleted`, "@": `meta` }),
+    (n = {
+      name: `diff`,
+      token: function (e) {
+        var n = e.string.search(/[\t ]+?$/);
+        if (!e.sol() || n === 0)
+          return (e.skipToEnd(), (`error ` + (t[e.string.charAt(0)] || ``)).replace(/ $/, ``));
+        var r = t[e.peek()] || e.skipToEnd();
+        return (n === -1 ? e.skipToEnd() : (e.pos = n), r);
+      },
+    }));
+})();
+export { n as diff };
+//# sourceMappingURL=diff-0FqzS32D.js.map

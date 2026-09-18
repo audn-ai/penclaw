@@ -1,0 +1,65 @@
+import {
+  E as resolveWritableRenameTargetsForBridge,
+  T as resolveWritableRenameTargets,
+  _ as disposeSshSandboxSession,
+  a as getSandboxBackendFactory,
+  b as uploadDirectoryToSshTarget,
+  c as registerSandboxBackend,
+  d as buildRemoteCommand,
+  f as buildRemoteWorkdirValidationCommand,
+  g as createSshSandboxSessionFromSettings,
+  h as createSshSandboxSessionFromConfigText,
+  l as requireSandboxBackendFactory,
+  m as buildValidatedExecRemoteCommand,
+  o as getSandboxBackendManager,
+  p as buildSshSandboxArgv,
+  s as getSandboxBackendWorkdirResolver,
+  u as buildExecRemoteCommand,
+  v as runSshSandboxCommand,
+  w as createWritableRenameTargetResolver,
+  x as createRemoteShellSandboxFsBridge,
+  y as shellEscape,
+} from "../browser-bridges-B_JokzBZ.js";
+import {
+  i as withTempWorkspaceSync,
+  n as tempWorkspaceSync,
+  r as withTempWorkspace,
+  t as tempWorkspace,
+} from "../private-temp-workspace-BrSGWjaU.js";
+import { t as runPluginCommandWithTimeout } from "../run-command-jyi8dasm.js";
+import { n as resolveSandboxRuntimeStatus } from "../runtime-status-DT_QCQQG.js";
+import { t as sanitizeEnvVars } from "../sanitize-env-vars-JDpL4YLs.js";
+import { n as resolvePreferredOpenClawTmpDir } from "../tmp-openclaw-dir-uPgNO8da.js";
+import { n as isToolAllowed } from "../tool-policy-fLngst7L.js";
+import "../sandbox-LwuCYzj8.js";
+export {
+  buildExecRemoteCommand,
+  buildRemoteCommand,
+  buildRemoteWorkdirValidationCommand,
+  buildSshSandboxArgv,
+  buildValidatedExecRemoteCommand,
+  createRemoteShellSandboxFsBridge,
+  createSshSandboxSessionFromConfigText,
+  createSshSandboxSessionFromSettings,
+  createWritableRenameTargetResolver,
+  disposeSshSandboxSession,
+  getSandboxBackendFactory,
+  getSandboxBackendManager,
+  getSandboxBackendWorkdirResolver,
+  isToolAllowed,
+  registerSandboxBackend,
+  requireSandboxBackendFactory,
+  resolvePreferredOpenClawTmpDir,
+  resolveSandboxRuntimeStatus,
+  resolveWritableRenameTargets,
+  resolveWritableRenameTargetsForBridge,
+  runPluginCommandWithTimeout,
+  runSshSandboxCommand,
+  sanitizeEnvVars,
+  shellEscape,
+  tempWorkspace,
+  tempWorkspaceSync,
+  uploadDirectoryToSshTarget,
+  withTempWorkspace,
+  withTempWorkspaceSync,
+};

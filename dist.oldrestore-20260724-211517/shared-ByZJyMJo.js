@@ -1,0 +1,18 @@
+import {
+  a as stopSharedClient,
+  i as resolveSharedMatrixClient,
+  n as releaseSharedClientInstance,
+  o as stopSharedClientForAccount,
+  r as removeSharedClientInstance,
+  s as stopSharedClientInstance,
+  t as acquireSharedMatrixClient,
+} from "./shared-BQILq3IO.js";
+export {
+  acquireSharedMatrixClient,
+  releaseSharedClientInstance,
+  removeSharedClientInstance,
+  resolveSharedMatrixClient,
+  stopSharedClient,
+  stopSharedClientForAccount,
+  stopSharedClientInstance,
+};

@@ -1,0 +1,20 @@
+//#region extensions/opencode/session-catalog-shared.ts
+const OPENCODE_SESSIONS_LIST_COMMAND = "opencode.sessions.list.v1";
+const OPENCODE_SESSION_READ_COMMAND = "opencode.sessions.read.v1";
+const OPENCODE_TERMINAL_RESUME_COMMAND = "opencode.terminal.resume.v1";
+const OPENCODE_SESSIONS_CAPABILITY = "opencode-sessions";
+const OPENCODE_LOCAL_SESSION_HOST_ID = "gateway";
+const OPENCODE_SESSION_CATALOG_MAX_PAGE_LIMIT = 100;
+const OPENCODE_NODE_INVOKE_TIMEOUT_MS = 35e3;
+const OPENCODE_SESSION_ID_PATTERN = /^(?!-)[A-Za-z0-9._:-]{1,256}$/u;
+//#endregion
+export {
+  OPENCODE_SESSION_CATALOG_MAX_PAGE_LIMIT as a,
+  OPENCODE_TERMINAL_RESUME_COMMAND as c,
+  OPENCODE_SESSIONS_LIST_COMMAND as i,
+  OPENCODE_NODE_INVOKE_TIMEOUT_MS as n,
+  OPENCODE_SESSION_ID_PATTERN as o,
+  OPENCODE_SESSIONS_CAPABILITY as r,
+  OPENCODE_SESSION_READ_COMMAND as s,
+  OPENCODE_LOCAL_SESSION_HOST_ID as t,
+};

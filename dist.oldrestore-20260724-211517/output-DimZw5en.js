@@ -1,0 +1,230 @@
+import { log } from "@clack/prompts";
+import { g as redactMigrationPlan } from "./migration-nGWjmzKy.js";
+import { i as writeRuntimeJson } from "./runtime-Bz6o617W.js";
+import { r as theme } from "./theme-vjDs9tao.js";
+//#region src/commands/migrate/output.ts
+/** Formatting and validation helpers for migration previews and apply results. */
+function formatCount(value, label) {
+  return `${value} ${label}${value === 1 ? "" : "s"}`;
+}
+function formatPlanHeader(plan, heading) {
+  const lines = [`${theme.heading(heading)} ${plan.providerId}`, `Source: ${plan.source}`];
+  if (plan.target) lines.push(`Target: ${plan.target}`);
+  const visible = plan.items.filter((item) => !HIDDEN_KINDS.has(item.kind));
+  lines.push(
+    [
+      formatCount(visible.length, "item"),
+      formatCount(plan.summary.conflicts, "conflict"),
+      formatCount(plan.summary.sensitive, "sensitive item"),
+    ].join(", "),
+  );
+  return lines;
+}
+const ITEM_GROUPS = [
+  {
+    kind: "auth",
+    heading: "Auth credentials:",
+  },
+  {
+    kind: "skill",
+    heading: "Skills:",
+  },
+  {
+    kind: "plugin",
+    heading: "Plugins:",
+  },
+  {
+    kind: "memory",
+    heading: "Memory:",
+  },
+  {
+    kind: "secret",
+    heading: "Secrets:",
+  },
+  {
+    kind: "archive",
+    heading: "Archive:",
+  },
+  {
+    kind: "manual",
+    heading: "Manual review:",
+  },
+];
+const HIDDEN_KINDS = /* @__PURE__ */ new Set(["config"]);
+const KNOWN_KINDS = new Set(ITEM_GROUPS.map((group) => group.kind));
+function formatPlanItems(plan, mode) {
+  const lines = [];
+  const buckets = /* @__PURE__ */ new Map();
+  const other = [];
+  for (const item of plan.items) {
+    if (HIDDEN_KINDS.has(item.kind)) continue;
+    if (KNOWN_KINDS.has(item.kind)) {
+      const list = buckets.get(item.kind) ?? [];
+      list.push(item);
+      buckets.set(item.kind, list);
+    } else other.push(item);
+  }
+  for (const group of ITEM_GROUPS) {
+    const items = buckets.get(group.kind);
+    if (!items || items.length === 0) continue;
+    lines.push("");
+    lines.push(theme.heading(group.heading));
+    for (const item of items) lines.push(formatMigrationItem(item, mode));
+  }
+  if (other.length > 0) {
+    lines.push("");
+    lines.push(theme.heading("Other:"));
+    for (const item of other) lines.push(formatMigrationItem(item, mode));
+  }
+  return lines;
+}
+function formatPlanWarnings(plan) {
+  if (!plan.warnings || plan.warnings.length === 0) return [];
+  const lines = ["", theme.warn("Warnings:")];
+  for (const warning of plan.warnings) lines.push(`⚠️  ${warning}`);
+  return lines;
+}
+/** Formats a redaction-safe migration preview for terminal output. */
+function formatMigrationPreview(plan) {
+  const safePlan = redactMigrationPlan(plan);
+  return [
+    ...formatPlanHeader(safePlan, "Migration preview:"),
+    ...formatPlanItems(safePlan, "preview"),
+    ...formatPlanWarnings(safePlan),
+  ];
+}
+/** Formats redaction-safe migration apply results for terminal output. */
+function formatMigrationResult(plan) {
+  const safePlan = redactMigrationPlan(plan);
+  const lines = [
+    ...formatPlanHeader(safePlan, "Migration plan:"),
+    ...formatPlanItems(safePlan, "result"),
+  ];
+  if (safePlan.nextSteps && safePlan.nextSteps.length > 0) {
+    lines.push("");
+    lines.push(theme.heading("Next:"));
+    for (const step of safePlan.nextSteps) {
+      const prefix = safePlan.warnings?.includes(step) ? "⚠️ " : "•";
+      lines.push(`${prefix} ${step}`);
+    }
+  }
+  return lines;
+}
+function formatItemDisplayName(item) {
+  return item.id.replace(/^[^:]+:/, "").replace(/:\d+$/, "");
+}
+const REASON_CODE_MESSAGES = {
+  plugin_missing: "Plugin not found in the Codex marketplace",
+  marketplace_missing: "Codex marketplace is unavailable",
+  disabled: "Plugin is disabled in Codex",
+  refresh_failed: "Failed to refresh the Codex plugin marketplace",
+  auth_required: "Plugin requires additional authentication",
+  already_active: "Plugin is already active in OpenClaw",
+  installed: "Plugin is already installed in OpenClaw",
+  plugin_install_failed: "Plugin installation failed",
+  codex_subscription_required: "Plugin requires an active Codex subscription",
+  "not selected for migration": "Skipped because it was not selected for migration",
+};
+/** Shared short conflict phrases used by migration output and selection hints. */
+const MIGRATION_CONFLICT_REASON_PHRASES = {
+  "target exists": "already installed in workspace",
+  "plugin exists": "already installed in workspace",
+};
+function conflictReasonSentence(reason) {
+  const phrase = MIGRATION_CONFLICT_REASON_PHRASES[reason];
+  if (!phrase) return;
+  return `${phrase.charAt(0).toUpperCase()}${phrase.slice(1)}`;
+}
+function humanizeReason(reason) {
+  if (!reason) return;
+  return REASON_CODE_MESSAGES[reason] ?? conflictReasonSentence(reason) ?? reason;
+}
+function formatItemMessage(item, mode) {
+  if (mode === "preview") {
+    if (
+      item.status === "conflict" ||
+      item.status === "skipped" ||
+      item.status === "warning" ||
+      item.status === "error"
+    )
+      return humanizeReason(item.reason) ?? item.message;
+    if (item.kind === "skill" && item.action === "copy") return "Copy Codex skill into OpenClaw";
+    if (item.kind === "plugin" && item.action === "install")
+      return "Install Codex plugin into OpenClaw";
+    return item.message ?? humanizeReason(item.reason);
+  }
+  if (
+    (item.kind === "skill" && item.action === "copy") ||
+    (item.kind === "plugin" && item.action === "install")
+  ) {
+    if (item.status === "migrated") return "Migrated";
+    if (item.status === "skipped") return "Skipped";
+    if (item.status === "warning") return item.message ?? humanizeReason(item.reason);
+    if (item.status === "error" || item.status === "conflict")
+      return humanizeReason(item.reason) ?? item.message;
+    return;
+  }
+  if (item.status === "warning" || item.status === "error" || item.status === "conflict")
+    return humanizeReason(item.reason) ?? item.message;
+  return item.message ?? humanizeReason(item.reason);
+}
+const RESULT_STATUS_GLYPHS = {
+  migrated: "✅",
+  warning: "⚠️ ",
+  error: "❌",
+  skipped: "⏭️ ",
+  conflict: "⚠️ ",
+};
+function formatItemPrefix(item) {
+  if (item.kind === "manual") return "🔍 ";
+  if (item.kind === "archive") return "📖 ";
+  const glyph = RESULT_STATUS_GLYPHS[item.status];
+  if (glyph) return `${glyph} `;
+  return "• ";
+}
+function formatMigrationItem(item, mode) {
+  const name = formatItemDisplayName(item);
+  const message = formatItemMessage(item, mode);
+  const messageSuffix = message ? ` ${theme.muted(`(${message})`)}` : "";
+  const sensitive = item.sensitive ? " [sensitive]" : "";
+  return `${formatItemPrefix(item)}${name}${sensitive}${messageSuffix}`;
+}
+/** Throws when a plan still contains conflicts that require explicit overwrite. */
+function assertConflictFreePlan(plan, providerId) {
+  if (plan.summary.conflicts > 0)
+    throw new Error(
+      `Migration has ${formatCount(plan.summary.conflicts, "conflict")}. Re-run with --overwrite after reviewing openclaw migrate plan ${providerId}.`,
+    );
+}
+/** Writes apply results as redacted JSON or terminal text with backup/report paths. */
+function writeApplyResult(runtime, opts, result) {
+  if (opts.json) {
+    writeRuntimeJson(runtime, redactMigrationPlan(result));
+    return;
+  }
+  log.message(formatMigrationResult(result).join("\n"));
+  if (result.backupPath) runtime.log(`Backup: ${result.backupPath}`);
+  else if (!opts.noBackup) runtime.log("Backup: skipped (no existing OpenClaw state found)");
+  if (result.reportDir) runtime.log(`Report: ${result.reportDir}`);
+}
+/** Throws when apply completed with conflicts or errors. */
+function assertApplySucceeded(result) {
+  if (result.summary.errors === 0 && result.summary.conflicts === 0) return;
+  const reportHint = result.reportDir ? ` See report: ${result.reportDir}.` : "";
+  if (result.summary.errors > 0)
+    throw new Error(
+      `Migration finished with ${formatCount(result.summary.errors, "error")}.${reportHint}`,
+    );
+  throw new Error(
+    `Migration finished with ${formatCount(result.summary.conflicts, "conflict")}.${reportHint}`,
+  );
+}
+//#endregion
+export {
+  formatMigrationResult as a,
+  formatMigrationPreview as i,
+  assertApplySucceeded as n,
+  writeApplyResult as o,
+  assertConflictFreePlan as r,
+  MIGRATION_CONFLICT_REASON_PHRASES as t,
+};

@@ -1,0 +1,65 @@
+import { n as e } from "./rolldown-runtime-DaJ6WEGw.js";
+function t() {
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise((e, t) => {
+      setTimeout(() => t(Error(`Service worker not ready (timed out)`)), s);
+    }),
+  ]);
+}
+function n(e) {
+  let t = (e + `=`.repeat((4 - (e.length % 4)) % 4)).replace(/-/g, `+`).replace(/_/g, `/`),
+    n = atob(t),
+    r = new Uint8Array(n.length);
+  for (let e = 0; e < n.length; e += 1) r[e] = n.charCodeAt(e);
+  return r;
+}
+async function r() {
+  return `serviceWorker` in navigator ? await (await t()).pushManager.getSubscription() : null;
+}
+async function i(e) {
+  let r = await Notification.requestPermission();
+  if (r !== `granted`) throw Error(`Notification permission ${r}`);
+  let i = (await e.request(`push.web.vapidPublicKey`, {})).vapidPublicKey;
+  if (!i) throw Error(`Failed to retrieve VAPID public key`);
+  let a = await (
+      await t()
+    ).pushManager.subscribe({ userVisibleOnly: !0, applicationServerKey: n(i).buffer }),
+    o = a.toJSON();
+  if (!o.endpoint || !o.keys?.p256dh || !o.keys.auth)
+    throw Error(`Invalid push subscription from browser`);
+  try {
+    return await e.request(`push.web.subscribe`, {
+      endpoint: o.endpoint,
+      keys: { p256dh: o.keys.p256dh, auth: o.keys.auth },
+    });
+  } catch (e) {
+    try {
+      await a.unsubscribe();
+    } catch {}
+    throw e;
+  }
+}
+async function a(e) {
+  let n = await (await t()).pushManager.getSubscription();
+  if (n) {
+    try {
+      await e.request(`push.web.unsubscribe`, { endpoint: n.endpoint });
+    } catch {}
+    await n.unsubscribe();
+  }
+}
+async function o(e) {
+  await e.request(`push.web.test`, {});
+}
+var s;
+e(() => {
+  s = 1e4;
+})();
+export {
+  r as getExistingSubscription,
+  o as sendTestWebPush,
+  i as subscribeToWebPush,
+  a as unsubscribeFromWebPush,
+};
+//# sourceMappingURL=web-push.runtime-DKosh2vX.js.map

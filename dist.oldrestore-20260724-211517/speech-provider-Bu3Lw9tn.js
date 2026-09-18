@@ -1,0 +1,303 @@
+import { r as fetchWithSsrFGuard } from "./fetch-guard-Da47iiZE.js";
+import { b as transcodeAudioBufferToOpus } from "./media-services-Czws84B5.js";
+import { j as resolveTimerTimeoutMs } from "./number-coercion-CJQ8TR--.js";
+import {
+  i as assertOkOrThrowProviderError,
+  m as readProviderJsonResponse,
+  n as asObject,
+} from "./provider-http-errors-DLMRBkZU.js";
+import { y as ssrfPolicyFromHttpBaseUrlAllowedHostname } from "./ssrf-keFRGQLq.js";
+import { c as normalizeOptionalString } from "./string-coerce-DW4mBlAt.js";
+import { f as normalizeResolvedSecretInputString } from "./types.secrets-BV0ywRAy.js";
+import "./media-runtime-BhmZORKM.js";
+import "./number-runtime-B-n-wjMn.js";
+import "./speech-core-CWj6o89Y.js";
+import "./secret-input-D1aG0n6v.js";
+import "./ssrf-runtime-DJ478vv8.js";
+import "./provider-http-BDIltggC.js";
+//#region extensions/xiaomi/speech-provider.ts
+const DEFAULT_XIAOMI_TTS_BASE_URL = "https://api.xiaomimimo.com/v1";
+const DEFAULT_XIAOMI_TTS_MODEL = "mimo-v2.5-tts";
+const DEFAULT_XIAOMI_TTS_VOICE = "mimo_default";
+const DEFAULT_XIAOMI_TTS_FORMAT = "mp3";
+const XIAOMI_TTS_VOICE_DESIGN_MODEL = "mimo-v2.5-tts-voicedesign";
+const DEFAULT_XIAOMI_TTS_VOICE_DESIGN_STYLE =
+  "Warm, natural, and friendly voice with clear pronunciation and conversational pacing.";
+const XIAOMI_TTS_MODELS = ["mimo-v2.5-tts", "mimo-v2-tts", XIAOMI_TTS_VOICE_DESIGN_MODEL];
+const XIAOMI_TTS_VOICES = [
+  "mimo_default",
+  "default_zh",
+  "default_en",
+  "Mia",
+  "Chloe",
+  "Milo",
+  "Dean",
+];
+const XIAOMI_TTS_FORMATS = ["mp3", "wav"];
+function normalizeXiaomiTtsBaseUrl(baseUrl) {
+  return (baseUrl?.trim() || DEFAULT_XIAOMI_TTS_BASE_URL).replace(/\/+$/, "");
+}
+function normalizeXiaomiTtsFormat(value) {
+  const normalized = normalizeOptionalString(value)?.toLowerCase();
+  return XIAOMI_TTS_FORMATS.includes(normalized) ? normalized : void 0;
+}
+function resolveXiaomiTtsConfigRecord(rawConfig) {
+  const providers = asObject(rawConfig.providers);
+  return asObject(providers?.xiaomi) ?? asObject(providers?.mimo) ?? asObject(rawConfig.xiaomi);
+}
+function normalizeXiaomiTtsProviderConfig(rawConfig) {
+  const raw = resolveXiaomiTtsConfigRecord(rawConfig);
+  return {
+    apiKey: normalizeResolvedSecretInputString({
+      value: raw?.apiKey,
+      path: "messages.tts.providers.xiaomi.apiKey",
+    }),
+    baseUrl: normalizeXiaomiTtsBaseUrl(
+      normalizeOptionalString(raw?.baseUrl) ?? normalizeOptionalString(process.env.XIAOMI_BASE_URL),
+    ),
+    model:
+      normalizeOptionalString(raw?.model) ??
+      normalizeOptionalString(raw?.modelId) ??
+      normalizeOptionalString(process.env.XIAOMI_TTS_MODEL) ??
+      DEFAULT_XIAOMI_TTS_MODEL,
+    voice:
+      normalizeOptionalString(raw?.speakerVoice) ??
+      normalizeOptionalString(raw?.speakerVoiceId) ??
+      normalizeOptionalString(raw?.voice) ??
+      normalizeOptionalString(raw?.voiceId) ??
+      normalizeOptionalString(process.env.XIAOMI_TTS_VOICE) ??
+      DEFAULT_XIAOMI_TTS_VOICE,
+    format:
+      normalizeXiaomiTtsFormat(raw?.format) ??
+      normalizeXiaomiTtsFormat(process.env.XIAOMI_TTS_FORMAT) ??
+      DEFAULT_XIAOMI_TTS_FORMAT,
+    style: normalizeOptionalString(raw?.style),
+  };
+}
+function readXiaomiTtsProviderConfig(config) {
+  const normalized = normalizeXiaomiTtsProviderConfig({});
+  return {
+    apiKey:
+      normalizeResolvedSecretInputString({
+        value: config.apiKey,
+        path: "messages.tts.providers.xiaomi.apiKey",
+      }) ?? normalized.apiKey,
+    baseUrl: normalizeXiaomiTtsBaseUrl(
+      normalizeOptionalString(config.baseUrl) ?? normalized.baseUrl,
+    ),
+    model:
+      normalizeOptionalString(config.model) ??
+      normalizeOptionalString(config.modelId) ??
+      normalized.model,
+    voice:
+      normalizeOptionalString(config.speakerVoice) ??
+      normalizeOptionalString(config.speakerVoiceId) ??
+      normalizeOptionalString(config.voice) ??
+      normalizeOptionalString(config.voiceId) ??
+      normalized.voice,
+    format: normalizeXiaomiTtsFormat(config.format) ?? normalized.format,
+    style: normalizeOptionalString(config.style) ?? normalized.style,
+  };
+}
+function readXiaomiTtsOverrides(overrides) {
+  if (!overrides) return {};
+  return {
+    model: normalizeOptionalString(overrides.model) ?? normalizeOptionalString(overrides.modelId),
+    voice:
+      normalizeOptionalString(overrides.speakerVoice) ??
+      normalizeOptionalString(overrides.speakerVoiceId) ??
+      normalizeOptionalString(overrides.voice) ??
+      normalizeOptionalString(overrides.voiceId),
+    format: normalizeXiaomiTtsFormat(overrides.format),
+    style: normalizeOptionalString(overrides.style),
+  };
+}
+function parseDirectiveToken(ctx) {
+  switch (ctx.key) {
+    case "voice":
+    case "voiceid":
+    case "voice_id":
+    case "mimo_voice":
+    case "xiaomi_voice":
+      if (!ctx.policy.allowVoice) return { handled: true };
+      return {
+        handled: true,
+        overrides: { voice: ctx.value },
+      };
+    case "model":
+    case "mimo_model":
+    case "xiaomi_model":
+      if (!ctx.policy.allowModelId) return { handled: true };
+      return {
+        handled: true,
+        overrides: { model: ctx.value },
+      };
+    case "style":
+    case "mimo_style":
+    case "xiaomi_style":
+      if (!ctx.policy.allowVoiceSettings) return { handled: true };
+      return {
+        handled: true,
+        overrides: { style: ctx.value },
+      };
+    case "format":
+    case "responseformat":
+    case "response_format": {
+      if (!ctx.policy.allowVoiceSettings) return { handled: true };
+      const format = normalizeXiaomiTtsFormat(ctx.value);
+      if (!format)
+        return {
+          handled: true,
+          warnings: [`invalid Xiaomi TTS format "${ctx.value}"`],
+        };
+      return {
+        handled: true,
+        overrides: { format },
+      };
+    }
+    default:
+      return { handled: false };
+  }
+}
+function buildXiaomiTtsMessages(params) {
+  const style = normalizeOptionalString(params.style);
+  return [
+    ...(style
+      ? [
+          {
+            role: "user",
+            content: style,
+          },
+        ]
+      : []),
+    {
+      role: "assistant",
+      content: params.text,
+    },
+  ];
+}
+function isXiaomiVoiceDesignModel(model) {
+  return model === XIAOMI_TTS_VOICE_DESIGN_MODEL;
+}
+function resolveXiaomiVoiceDesignStyle(style) {
+  return normalizeOptionalString(style) ?? DEFAULT_XIAOMI_TTS_VOICE_DESIGN_STYLE;
+}
+function buildXiaomiTtsAudio(params) {
+  if (isXiaomiVoiceDesignModel(params.model)) return { format: params.format };
+  return {
+    format: params.format,
+    voice: params.voice,
+  };
+}
+function decodeXiaomiAudioData(body) {
+  const root = asObject(body);
+  const audioData = normalizeOptionalString(
+    asObject(
+      asObject(asObject((Array.isArray(root?.choices) ? root.choices : [])[0])?.message)?.audio,
+    )?.data,
+  );
+  if (!audioData) throw new Error("Xiaomi TTS API returned no audio data");
+  return Buffer.from(audioData, "base64");
+}
+async function xiaomiTTS(params) {
+  const { text, apiKey, baseUrl, model, voice, format, style, timeoutMs } = params;
+  const requestTimeoutMs = resolveTimerTimeoutMs(timeoutMs, 1);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+  const resolvedStyle = isXiaomiVoiceDesignModel(model)
+    ? resolveXiaomiVoiceDesignStyle(style)
+    : style;
+  try {
+    const { response, release } = await fetchWithSsrFGuard({
+      url: `${baseUrl}/chat/completions`,
+      init: {
+        method: "POST",
+        headers: {
+          "api-key": apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: buildXiaomiTtsMessages({
+            text,
+            style: resolvedStyle,
+          }),
+          audio: buildXiaomiTtsAudio({
+            model,
+            voice,
+            format,
+          }),
+        }),
+        signal: controller.signal,
+      },
+      timeoutMs: requestTimeoutMs,
+      policy: ssrfPolicyFromHttpBaseUrlAllowedHostname(baseUrl),
+      auditContext: "xiaomi.tts",
+    });
+    try {
+      await assertOkOrThrowProviderError(response, "Xiaomi TTS API error");
+      return decodeXiaomiAudioData(await readProviderJsonResponse(response, "Xiaomi TTS API"));
+    } finally {
+      await release();
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+function buildXiaomiSpeechProvider() {
+  return {
+    id: "xiaomi",
+    label: "Xiaomi MiMo",
+    aliases: ["mimo"],
+    autoSelectOrder: 45,
+    defaultModel: DEFAULT_XIAOMI_TTS_MODEL,
+    models: XIAOMI_TTS_MODELS,
+    voices: XIAOMI_TTS_VOICES,
+    resolveConfig: ({ rawConfig }) => normalizeXiaomiTtsProviderConfig(rawConfig),
+    parseDirectiveToken,
+    listVoices: async () =>
+      XIAOMI_TTS_VOICES.map((voice) => ({
+        id: voice,
+        name: voice,
+      })),
+    isConfigured: ({ providerConfig }) =>
+      Boolean(readXiaomiTtsProviderConfig(providerConfig).apiKey || process.env.XIAOMI_API_KEY),
+    synthesize: async (req) => {
+      const config = readXiaomiTtsProviderConfig(req.providerConfig);
+      const overrides = readXiaomiTtsOverrides(req.providerOverrides);
+      const apiKey = config.apiKey || process.env.XIAOMI_API_KEY;
+      if (!apiKey) throw new Error("Xiaomi API key missing");
+      const outputFormat = overrides.format ?? config.format;
+      const audioBuffer = await xiaomiTTS({
+        text: req.text,
+        apiKey,
+        baseUrl: config.baseUrl,
+        model: overrides.model ?? config.model,
+        voice: overrides.voice ?? config.voice,
+        format: outputFormat,
+        style: overrides.style ?? config.style,
+        timeoutMs: req.timeoutMs,
+      });
+      if (req.target === "voice-note")
+        return {
+          audioBuffer: await transcodeAudioBufferToOpus({
+            audioBuffer,
+            inputExtension: outputFormat,
+            tempPrefix: "tts-xiaomi-",
+            timeoutMs: req.timeoutMs,
+          }),
+          outputFormat: "opus",
+          fileExtension: ".opus",
+          voiceCompatible: true,
+        };
+      return {
+        audioBuffer,
+        outputFormat,
+        fileExtension: `.${outputFormat}`,
+        voiceCompatible: false,
+      };
+    },
+  };
+}
+//#endregion
+export { buildXiaomiSpeechProvider as t };
